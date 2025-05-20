@@ -1,4 +1,5 @@
 import * as net from "net"
+import { resolve } from "path"
 
 //A promise based API for TCP sockets
 type TCPConn = {
@@ -14,6 +15,38 @@ type TCPConn = {
 		reject: (reason: Error) => void,
 	}
 }
+
+//A dynamic sized buffer
+type DynBuf = {
+	data: Buffer,
+	length: number,
+}
+
+type TCPListener = {
+	server: net.Server
+}
+
+
+//append data to DybBuf
+function bufPush(buf: DynBuf, data: Buffer): void {
+	const newLen = buf.length + data.length
+
+	if (buf.data.length < newLen) {
+		//grow buffer capacity
+		let cap = Math.max(buf.data.length, 32);
+		if (cap < newLen) {
+			cap *= 2;
+		}
+
+		const grown = Buffer.alloc(cap);
+		buf.data.copy(grown, 0, 0)
+		buf.data = grown
+	}
+
+	data.copy(buf.data, buf.length, 0);
+	buf.length = newLen
+}
+
 //2.Accept new connections
 async function newConn(socket: net.Socket): Promise<void> {
 	console.log('new connection', socket.remoteAddress, socket.remotePort);
@@ -113,11 +146,32 @@ async function serveClient(socket: net.Socket) {
 	}
 }
 
-let server = net.createServer({allowHalfOpen:true, pauseOnConnect:true});
-server.on('error', (err) => {throw err})
-server.on('connection', newConn);
-server.listen({host: '127.0.0.1', port: 1234}, () => {
-	console.log("Listening on port 1234")
-});
+function soListen(port:number, host:string='127.0.0.1'):TCPListener {
+	let server = net.createServer({allowHalfOpen:true, pauseOnConnect:true});
+	server.listen({host, port}, () => {
+		console.log(`Server Listening on ${host}:${port}`)
+	});
+
+	return { server }
+}
+
+function soAccept(listener: TCPListener):Promise<TCPConn> {
+	return new Promise((resolve) => {
+		listener.server.once('connection', (socket: net.Socket) => {
+			const conn:TCPConn = soInit(socket)
+			resolve(conn)
+		})
+	})
+}
+
+async function main() {
+	const listener = soListen(1234)
+	while (true) {
+		const conn = await soAccept(listener)
+		console.log('Accepted new connection')
+		serveClient(conn.socket)
+	}
+}
+
 
 
