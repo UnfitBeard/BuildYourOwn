@@ -1,3 +1,4 @@
+import { readSync } from "fs"
 import * as net from "net"
 import { resolve } from "path"
 
@@ -6,11 +7,11 @@ type TCPConn = {
 	//the JS Socket Object
 	socket: net.Socket
 	// from the 'error' event
-	err: null|Error
+	err: null | Error
 	//EOF from the end event
 	ended: boolean
 	//the callbacks of the promise of the current read
-	reader: null|{
+	reader: null | {
 		resolve: (value: Buffer) => void,
 		reject: (reason: Error) => void,
 	}
@@ -63,7 +64,7 @@ async function newConn(socket: net.Socket): Promise<void> {
 //create a wrapper from net.Socket
 function soInit(socket: net.Socket): TCPConn {
 	const conn: TCPConn = {
-		socket: socket,err:null, ended:false, reader: null
+		socket: socket, err: null, ended: false, reader: null
 	};
 	socket.on('data', (data: Buffer) => {
 		console.assert(conn.reader);
@@ -82,7 +83,7 @@ function soInit(socket: net.Socket): TCPConn {
 			conn.reader = null
 		}
 	});
-	
+
 	socket.on('error', (err: Error) => {
 		//errors are also delivered to the current read
 		conn.err = err
@@ -95,7 +96,7 @@ function soInit(socket: net.Socket): TCPConn {
 }
 
 //returns an empty buffer after EOF
-function soRead(conn: TCPConn) :Promise<Buffer> {
+function soRead(conn: TCPConn): Promise<Buffer> {
 	console.assert(!conn.reader)// no concurrent calls
 	return new Promise((resolve, reject) => {
 		if (conn.err) {
@@ -108,12 +109,12 @@ function soRead(conn: TCPConn) :Promise<Buffer> {
 		}
 
 		//save the promise callbacks
-		conn.reader = {resolve: resolve, reject: reject};
+		conn.reader = { resolve: resolve, reject: reject };
 		//and resume the data event to fulfill the promise later
 		conn.socket.resume()
 	})
 }
-function soWrite(conn: TCPConn, data:Buffer): Promise<void> {
+function soWrite(conn: TCPConn, data: Buffer): Promise<void> {
 	console.assert(data.length > 0)
 	return new Promise((resolve, reject) => {
 		if (conn.err) {
@@ -133,32 +134,59 @@ function soWrite(conn: TCPConn, data:Buffer): Promise<void> {
 }
 
 async function serveClient(socket: net.Socket) {
-	const conn:TCPConn = soInit(socket)
+	const conn: TCPConn = soInit(socket)
+	const buf: DynBuf = { data: Buffer.alloc(0), length: 0 }
 	while (true) {
-		const data = await soRead(conn);
-		if (data.length === 0) {
-			console.log('end connection')
-			break
+		//try to get one message from the buffer
+		const msg: null | Buffer = cutMessage(buf)
+		if (!msg) {
+			//need more data
+			const data = await soRead(conn);
+			bufPush(buf, data)
+			// EOF
+			if (data.length === 0) {
+				console.log('end connection')
+				return
+			}
+			console.log('data', data);
+			await soWrite(conn, data)
 		}
-
-		console.log('data', data);
-		await soWrite(conn, data)
+		// got some data try it again
+		continue
 	}
 }
 
-function soListen(port:number, host:string='127.0.0.1'):TCPListener {
-	let server = net.createServer({allowHalfOpen:true, pauseOnConnect:true});
-	server.listen({host, port}, () => {
+function cutMessage(buf: DynBuf): null|Buffer {
+	//messages are separated by '\n'
+	const idx = buf.data.subarray(0, buf.length).indexOf('\n');
+	if (idx < 0) {
+		return null // not complete
+	}
+	// make a copy of the message and move the remaining data to the front
+	const msg = Buffer.from(buf.data.subarray(0, idx + 1));
+	bufPop(buf, idx + 1);
+	return msg
+}
+
+// remove data from the front
+function bufPop(buf:DynBuf, len: number): void {
+	buf.data.copyWithin(0, len, buf.length);
+	buf.length -= len;
+}
+
+function soListen(port: number, host: string = '127.0.0.1'): TCPListener {
+	let server = net.createServer({ allowHalfOpen: true, pauseOnConnect: true });
+	server.listen({ host, port }, () => {
 		console.log(`Server Listening on ${host}:${port}`)
 	});
 
 	return { server }
 }
 
-function soAccept(listener: TCPListener):Promise<TCPConn> {
+function soAccept(listener: TCPListener): Promise<TCPConn> {
 	return new Promise((resolve) => {
 		listener.server.once('connection', (socket: net.Socket) => {
-			const conn:TCPConn = soInit(socket)
+			const conn: TCPConn = soInit(socket)
 			resolve(conn)
 		})
 	})
