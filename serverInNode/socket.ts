@@ -139,9 +139,10 @@ async function serveClient(socket: net.Socket) {
 	while (true) {
 		//try to get one message from the buffer
 		const msg: null | Buffer = cutMessage(buf)
+		const text = msg?.toString().trim()
 		if (!msg) {
 			//need more data
-			const data = await soRead(conn);
+			const data: Buffer = await soRead(conn);
 			bufPush(buf, data)
 			// EOF
 			if (data.length === 0) {
@@ -150,14 +151,23 @@ async function serveClient(socket: net.Socket) {
 			}
 			console.log('data', data);
 			await soWrite(conn, data)
+			// got some data try it again
+			continue
 		}
-		// got some data try it again
-		continue
+
+		if (msg.equals(Buffer.from('quit\n'))) {
+			await soWrite(conn, Buffer.from('Bye.\n'));
+			socket.destroy()
+			return
+		} else {
+			const reply = Buffer.concat([Buffer.from('Echo: '), msg])
+			await soWrite(conn, reply)
+		}
 	}
 }
 
 function cutMessage(buf: DynBuf): null|Buffer {
-	//messages are separated by '\n'
+	// messages are separated by '\n'
 	const idx = buf.data.subarray(0, buf.length).indexOf('\n');
 	if (idx < 0) {
 		return null // not complete
