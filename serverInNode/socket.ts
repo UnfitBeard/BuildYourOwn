@@ -1,6 +1,4 @@
-import { readSync } from "fs"
 import * as net from "net"
-import { resolve } from "path"
 
 //A promise based API for TCP sockets
 type TCPConn = {

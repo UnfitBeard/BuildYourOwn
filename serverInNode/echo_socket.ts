@@ -1,7 +1,4 @@
-import { rejects } from 'assert'
-import { error } from 'console'
 import * as net from 'net'
-import { resolve } from 'path'
 
 type TCPConn = {
     socket: net.Socket,
@@ -107,9 +104,32 @@ async function serveClient(socket: net.Socket):Promise<void> {
     }
 }
 
-let server = net.createServer({})
-server.listen({ port: 1234, hostname: '127.0.0.1' }, () => {
-    console.log('Server listening on port 1234')
-})
-server.on('connection', newConn)
-server.on('error', (error: Error) => { console.log('Error:', error) })
+type TCPListener = {
+  server: net.Server
+}
+
+function soListen(port:number = 1234, host:string = '127.0.0.1') :TCPListener {
+    let server = net.createServer({allowHalfOpen:true, pauseOnConnect:true})
+    server.listen({ port, host }, () => {
+        console.log('Server listening on port 1234')
+    })
+    return { server }
+}
+
+function soAccept(listener: TCPListener): Promise<TCPConn> {
+    return new Promise((resolve) => {
+        listener.server.once('connection', (socket: net.Socket)=>{
+            const conn:TCPConn = soInit(socket)
+            resolve(conn)
+        })
+    })
+}
+
+async function main(socket: net.Socket) {
+    const listener = await soListen()
+    while (true) {
+        const conn = await soAccept(listener)
+        console.log('Accepted new connection')
+        serveClient(conn.socket)
+    }
+}
