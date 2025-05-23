@@ -21,6 +21,7 @@ type TCPConn = {
 type DynBuf = {
 	data: Buffer,
 	length: number,
+	offset: number //current read offset
 }
 
 type TCPListener = {
@@ -135,7 +136,7 @@ function soWrite(conn: TCPConn, data: Buffer): Promise<void> {
 
 async function serveClient(socket: net.Socket) {
 	const conn: TCPConn = soInit(socket)
-	const buf: DynBuf = { data: Buffer.alloc(0), length: 0 }
+	const buf: DynBuf = { data: Buffer.alloc(0), length: 0, offset:0 }
 	while (true) {
 		//try to get one message from the buffer
 		const msg: null | Buffer = cutMessage(buf)
@@ -168,20 +169,31 @@ async function serveClient(socket: net.Socket) {
 
 function cutMessage(buf: DynBuf): null|Buffer {
 	// messages are separated by '\n'
-	const idx = buf.data.subarray(0, buf.length).indexOf('\n');
+	const slice = buf.data.subarray(buf.offset,buf.length);
+	const idx = slice.indexOf('\n');
 	if (idx < 0) {
 		return null // not complete
-	}
+	} 
+
 	// make a copy of the message and move the remaining data to the front
-	const msg = Buffer.from(buf.data.subarray(0, idx + 1));
-	bufPop(buf, idx + 1);
+	const msg = Buffer.from(slice.subarray(0, idx + 1));
+	//change the beggining to the back of the next message
+	buf.offset += idx + 1
+	//Hold remaining data in place until wasted space reaches a threshold like 1/2 capacity
+	const wasted = buf.offset
+	const capacity = buf.data.length
+
+	if (wasted >= capacity/2) {
+		bufPop(buf);
+	}
 	return msg
 }
 
 // remove data from the front
-function bufPop(buf:DynBuf, len: number): void {
-	buf.data.copyWithin(0, len, buf.length);
-	buf.length -= len;
+function bufPop(buf:DynBuf): void {
+	buf.data.copyWithin(0, buf.offset, buf.length);
+	buf.length -= buf.offset;
+	buf.offset = 0
 }
 
 function soListen(port: number, host: string = '127.0.0.1'): TCPListener {
