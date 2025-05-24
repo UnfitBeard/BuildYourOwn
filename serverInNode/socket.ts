@@ -70,7 +70,7 @@ function soInit(socket: net.Socket): TCPConn {
 		//pause data event until next read
 		conn.socket.pause();
 		//fulfill the promise of the current read
-		conn.reader!.resolve(data)
+		conn.reader?.resolve(data)
 		conn.reader = null
 	});
 
@@ -138,7 +138,6 @@ async function serveClient(socket: net.Socket) {
 	while (true) {
 		//try to get one message from the buffer
 		const msg: null | Buffer = cutMessage(buf)
-		const text = msg?.toString().trim()
 		if (!msg) {
 			//need more data
 			const data: Buffer = await soRead(conn);
@@ -220,6 +219,7 @@ async function main() {
 		serveClient(conn.socket)
 	}
 }
+main()
 
 
 
