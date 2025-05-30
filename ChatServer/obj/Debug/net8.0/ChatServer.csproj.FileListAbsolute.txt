@@ -1,0 +1,15 @@
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.deps.json
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.runtimeconfig.json
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.dll
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.pdb
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.GeneratedMSBuildEditorConfig.editorconfig
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.AssemblyInfoInputs.cache
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.AssemblyInfo.cs
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.csproj.CoreCompileInputs.cache
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.sourcelink.json
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.dll
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/refint/ChatServer.dll
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.pdb
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.genruntimeconfig.cache
+/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ref/ChatServer.dll
