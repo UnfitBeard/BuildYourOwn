@@ -16,6 +16,27 @@ type DynBuf = {
     offset: number
 }
 
+type HTTPReq = {
+    method: string,
+    uri: Buffer,
+    version: string,
+    headers: Buffer[],
+};
+
+// an HTTP response
+type HTTPRes = {
+    code: number,
+    headers: Buffer[],
+    body: BodyReader,
+};
+
+type BodyReader = {
+    // the "Content-Length", -1 if unknown.
+    length: number,
+    // read data. returns an empty buffer after EOF.
+    read: () => Promise<Buffer>,
+};
+
 async function newConn(socket: net.Socket) {
     console.log('new connection', socket.remoteAddress, socket.remotePort)
     //...
@@ -136,7 +157,7 @@ function bufPush(buf: DynBuf, data: Buffer) {
         buf.data.copy(grown, 0, 0)
         buf.data = grown
     }
-    
+
     data.copy(buf.data, buf.length, 0)
     buf.length = newLen
 }
