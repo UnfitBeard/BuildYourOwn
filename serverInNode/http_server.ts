@@ -14,7 +14,6 @@ type HTTPRes = {
     body: BodyReader,
 }
 
-
 // interface for reading data from the HTTP body
 type BodyReader = {
     length: number,
@@ -27,27 +26,32 @@ type TCPConn = {
 
 type DynBuf = {
     data: Buffer,
-    length: number
+    length: number,
+    offset: number
 }
 
-type HTTPError = {
-    error: Error,
+class HTTPError extends Error {
+    code: number;
+    constructor(code: number, message: string) {
+        super(message);
+        this.code = code;
+    }
 }
 
 async function serveClient(conn: TCPConn): Promise<void> {
-    const buf: DynBuf = { data: Buffer.alloc(0), length: 0 }
+    const buf: DynBuf = { data: Buffer.alloc(0), length: 0, offset:0 }
     while (true) {
         // try to get 1 request header from the buffer
         const msg: null | HTTPReq = cutMessage(buf)
         if (!msg) {
-            const data = await soRead(conn)
+            const data:Buffer = await soRead(conn)
             bufPush(buf, data);
             // EOF
             if (data.length === 0 && buf.length === 0) {
                 return; // no more requests
             }
             if (data.length === 0) {
-                throw new Error(400, 'Unexpected EOF')
+                throw new HTTPError(400, 'Unexpected EOF')
             }
 
             //got some data 
@@ -114,7 +118,23 @@ function cutMessage(buf: DynBuf): null | HTTPReq {
     return msg;
 }
 
-function bufPush(buf: DynBuf, data: void) {
+function bufPush(buf: DynBuf, data: Buffer) {
+    const newLen = buf.data.length + data.length
+
+    if (newLen > buf.data.length) {
+        let cap = Math.max(32, buf.data.length)
+
+        if (cap < newLen) {
+            cap *= 2
+        }
+
+        const grown = Buffer.alloc(cap)
+        buf.data.copy(grown,0, 0)
+        buf.data = grown
+    }
+
+    data.copy(buf.data, buf.length, 0)
+    buf.length = newLen
 }
 
 function readerFromReq(
@@ -128,6 +148,26 @@ function readerFromReq(
             }
         }
         const bodyAllowed = !(req.method === 'GET' || req.method === 'HEAD')
+        const chunked = fieldGet(req.headers, 'Transfer-Encoding')
+        ?.equals(Buffer.from('chunked'))||false
+        if (!bodyAllowed && bodyLen > 0 || chunked) {
+            throw new HTTPError(400, 'Body not allowed')
+        }
+
+        if (!bodyAllowed) {
+            bodyLen = 0;
+        }
+
+        if (bodyLen >= 0) {
+            // "Content-Length" is present
+            return readerFromConnLength(conn, buf, bodyLen)
+        } else if (chunked) {
+            // chunked encoding
+            throw new HTTPError(501, 'TODO')
+        } else {
+            // read the rest of the connection
+            throw new HTTPError(501, 'TODO')
+        }
 }
 
 function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
@@ -164,11 +204,14 @@ function parseHTTPReq(data: Buffer): HTTPReq {
     }
 }
 
-function bufPop(buf: DynBuf, arg1: number) {
+function bufPop(buf: DynBuf, offset: number):void{
+    buf.data.copyWithin(0, buf.offset, buf.length);
+	buf.length -= buf.offset;
+	buf.offset = 0
 }
 
 function soRead(conn: TCPConn) {
-    throw new Error("Function not implemented.")
+    
 }
 
 function splitLines(data: Buffer): Buffer[] {
@@ -196,3 +239,40 @@ function parseDec(arg0: any): number {
     throw new Error("Function not implemented.")
 }
 
+function fieldGet(headers: Buffer[], key: string): null|Buffer {
+    for (const header of headers) {
+        if (header.toString('latin1').startsWith(key)) {
+            return header
+        }
+    }
+    return null
+}
+
+// Body reader from a socket with a known length
+function readerFromConnLength(
+    conn:TCPConn, buf:DynBuf, remain: number): BodyReader {
+        return {
+            length: remain,
+            read: async ():Promise<Buffer> => {
+                if (remain === 0) {
+                    return Buffer.from(''); //done
+                }
+                if (buf.length === 0) {
+                    // try and get some data if theres some
+                    const data = await soRead(conn)
+                    bufPush(buf, data)
+
+                    if (data.length === 0) {
+                        // expect more data
+                        throw new Error("Unexpected EOF from the HTTP Body")
+                    }
+                }
+                // consume data from the buffer
+                const consume = Math.min(buf.length, remain)
+                remain -= consume
+                const data = Buffer.from(buf.data.subarray(0, consume))
+                bufPop(buf, consume)
+                return data
+            },
+        }
+}
