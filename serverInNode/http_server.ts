@@ -22,6 +22,12 @@ type BodyReader = {
 
 type TCPConn = {
     socket: net.Socket,
+    err: null | Error,
+    ended: boolean,
+    reader: null | {
+        resolve: (value: Buffer) => void,
+        reject: (reason: Error) => void
+    }
 }
 
 type DynBuf = {
@@ -173,10 +179,58 @@ function readerFromReq(
 function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
 }
 
-function handleReq(msg: HTTPReq, reqBody: BodyReader): HTTPRes | PromiseLike<HTTPRes> {
+function handleReq(req: HTTPReq, body: BodyReader): Promise<HTTPRes> {
+    // act on the request Uri
+    let resp: BodyReader;
+    switch(req.uri.toString('latin1')) {
+        case '/echo':
+            // http echo server
+            resp = body;
+            break;
+        default:
+            resp = readerFromMemory(Buffer.from("hello world.\n"));
+            break;
+    }
+
+    return {
+        code: 200,
+        headers: [Buffer.from('Server: my_first_http_server')],
+        body: resp
+    }
 }
 
 function soInit(socket: net.Socket): TCPConn {
+    const conn:TCPConn = {
+        socket: socket,
+        err: null,
+        ended: false,
+        reader: null
+    }
+
+    socket.on('data', (data: Buffer) => {
+        console.assert(conn.reader);
+        conn.socket.pause();
+        conn.reader?.resolve(data);
+        conn.reader = null;
+    })
+
+    socket.on('end', () => {
+        conn.ended = true;
+        if (conn.reader) {
+            conn.reader.resolve(Buffer.from(''))//EOF
+            conn.reader = null;
+        }
+    })
+
+    socket.on('error', (error: Error) => {
+        conn.err = error;
+        if (conn.reader) {
+            conn.reader.reject(error)
+            conn.reader = null;
+        }
+    })
+
+    return conn;
 }
 
 function readerFromMemory(arg0: Buffer<ArrayBuffer>): BodyReader {
