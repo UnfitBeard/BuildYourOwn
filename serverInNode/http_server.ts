@@ -1,10 +1,16 @@
+import { rejects } from "assert"
 import * as net from "net"
+import { resolve } from "path"
 // parsed HTTP Request Header
 type HTTPReq = {
     method: string,
     uri: Buffer,
     version: string,
     headers: Buffer[],
+}
+
+type TCPListener = {
+	server: net.Server
 }
 
 // HTTP Response
@@ -176,7 +182,23 @@ function readerFromReq(
     }
 }
 
-function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
+async function writeHTTPResp(conn: TCPConn, resp: HTTPRes): Promise<void> {
+    if (resp.body.length < 0) {
+        throw new Error('TODO: chunked encoding')
+    }
+    // set the "Content-Length" field
+    console.assert(!fieldGet(resp.headers, 'Content-Length'))
+    resp.headers.push(Buffer.from(`Content-Length: ${resp.body.length}`))
+    // write the header
+    await soWrite(conn, encodeHTTPResp(resp));
+    // write the body
+    while (true) {
+        const data = await resp.body.read()
+        if (data.length === 0) {
+            break
+        }
+        await soWrite(conn, data)
+    }
 }
 
 function handleReq(req: HTTPReq, body: BodyReader): Promise<HTTPRes> {
@@ -237,7 +259,7 @@ function readerFromMemory(data: Buffer): BodyReader {
     let done = false;
     return {
         length: data.length,
-        read: async(): Promise<Buffer> => {
+        read: async (): Promise<Buffer> => {
             if (done) {
                 return Buffer.from('')// no more data
             } else {
@@ -277,18 +299,18 @@ function bufPop(buf: DynBuf, offset: number): void {
     buf.offset = 0
 }
 
-function soRead(conn: TCPConn):Promise<Buffer> {
+function soRead(conn: TCPConn): Promise<Buffer> {
     console.assert(!conn.reader); // no concurrent reads
     return new Promise((resolve, reject) => {
         if (conn.err) {
-			reject(conn.err);
-			return
-		}
-		if (conn.ended) {
-			resolve(Buffer.from('')) //EOF
-			return
-		}
-        conn.reader = {resolve: resolve, reject: reject}
+            reject(conn.err);
+            return
+        }
+        if (conn.ended) {
+            resolve(Buffer.from('')) //EOF
+            return
+        }
+        conn.reader = { resolve: resolve, reject: reject }
         conn.socket.resume()
     })
 
@@ -356,3 +378,51 @@ function readerFromConnLength(
         },
     }
 }
+function soWrite(conn: TCPConn, data: Buffer):Promise<void> {
+    console.assert(data.length > 0)
+    return new Promise((resolve, reject) => {
+        if (conn.err) {
+            throw new Error("Error")
+        }
+        conn.socket.write(data, (error: Error | null | undefined) => {
+            if (error) {
+                reject(error)
+            } else {
+                resolve()
+            }
+        })
+    })
+
+}
+
+function encodeHTTPResp(resp: HTTPRes): any {
+    throw new Error("Function not implemented.")
+}
+
+function soListen(port: number, host: string = '127.0.0.1'): TCPListener {
+	let server = net.createServer({ allowHalfOpen: true, pauseOnConnect: true });
+	server.listen({ host, port }, () => {
+		console.log(`Server Listening on ${host}:${port}`)
+	});
+
+	return { server }
+}
+
+function soAccept(listener: TCPListener): Promise<TCPConn> {
+	return new Promise((resolve) => {
+		listener.server.once('connection', (socket: net.Socket) => {
+			const conn: TCPConn = soInit(socket)
+			resolve(conn)
+		})
+	})
+}
+
+async function main() {
+	const listener = soListen(1234)
+	while (true) {
+		const conn = await soAccept(listener)
+		console.log('Accepted new connection')
+        serveClient(soInit(conn.socket))
+	}
+}
+main()

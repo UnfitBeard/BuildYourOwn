@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch './' --ext ts --exec 'node --loader ts-node/esm echo_socket.ts'"
+    "dev": "nodemon --watch './' --ext ts --exec 'node --loader ts-node/esm my_own_http_server.ts'"
   },
   "keywords": [],
   "author": "",
