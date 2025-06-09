@@ -7,6 +7,8 @@ repo.commit("Change1");
 
 const log = repo.log();
 
+// Can be used as repo.log()
+//ACtual command: > git log
 console.assert(log.length === 2, "Should have two commits");
 console.assert(log[0].id === 1, "First commit in log should be id 1");
 console.assert(log[1].id === 0, "Second commit in log should be id 0");

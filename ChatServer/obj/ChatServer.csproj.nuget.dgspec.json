@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/ChatServer.csproj": {}
+    "/Filesystem Root/Learning/BuildYourOwn/ChatServer/ChatServer.csproj": {}
   },
   "projects": {
-    "/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/ChatServer.csproj": {
+    "/Filesystem Root/Learning/BuildYourOwn/ChatServer/ChatServer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/ChatServer.csproj",
+        "projectUniqueName": "/Filesystem Root/Learning/BuildYourOwn/ChatServer/ChatServer.csproj",
         "projectName": "ChatServer",
-        "projectPath": "/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/ChatServer.csproj",
+        "projectPath": "/Filesystem Root/Learning/BuildYourOwn/ChatServer/ChatServer.csproj",
         "packagesPath": "/home/mr-nobody/.nuget/packages/",
-        "outputPath": "/home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/",
+        "outputPath": "/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/home/mr-nobody/.nuget/NuGet/NuGet.Config"

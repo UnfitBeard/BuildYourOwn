@@ -1,4 +1,5 @@
 import * as net from "net"
+import { buffer } from "stream/consumers"
 
 type TCPConn = {
     socket: net.Socket,
@@ -102,20 +103,60 @@ async function main() {
 main()
 
 async function serveClient(conn:TCPConn) {
+    const data:Buffer = await soRead(conn);
+    const buf:DynBuf = {data:Buffer.alloc(0), length:0, offset:0}
     while (true) {
-        const msg:Buffer = await soRead(conn);
-        if (msg.length === 0) {
+        const msg:Buffer|null = cutMessage(buf)
+       if (msg!.length === 0) {
             console.log(Buffer.from('')) //EOF
         } else {
             console.log(msg)
-            await soWrite(conn, msg)
+            bufPush(msg!, buf)
+            await soWrite(conn, msg!)
         }
     
-        if (msg.includes('q')) {
+        if (msg!.includes('q')) {
             console.log("Connection ended")
             conn.ended = true
             conn.socket.destroy()
         }
     }
+}
+
+function bufPush(data: Buffer, buf:DynBuf) {
+    let newLen = data.length + buf.length
+
+    if (newLen > buf.data.length) {
+        let cap = Math.max(32, newLen)
+
+        while (cap < newLen) {
+            cap += 2
+        }
+
+        const grown = Buffer.alloc(cap)
+        buf.data.copy(grown, 0, 0)
+        buf.data = grown
+    }
+
+    data.copy(buf.data, buf.length, 0)
+    buf.length = newLen
+}
+
+function cutMessage(buf: DynBuf):null|Buffer {
+    const slice = buf.data.subarray(0,buf.length)
+    const idx = slice.indexOf("\n")
+
+    if (idx < 0) {
+        return null;
+    }
+
+    const msg = Buffer.from(buf.data.subarray(0, idx + 1))
+    bufPop(buf, idx + 1)
+    return msg;
+}
+
+function bufPop(buf: DynBuf, len: number) {
+    buf.data.copyWithin(0, len, buf.length)
+    buf.length -= len
 }
 

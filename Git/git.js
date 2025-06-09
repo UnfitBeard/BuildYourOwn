@@ -39,7 +39,5 @@ Git.prototype.log = function () {
   return history;
 };
 
-// Can be used as repo.log()
-//ACtual command: > git log
-
+// Branches
 export default Git;
