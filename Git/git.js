@@ -57,8 +57,8 @@ Git.prototype.checkout = function (branchName) {
     }
     // If no branch with the name
     var branch = new Branch(branchName, this.HEAD.commit)
-    this.branches.push(branch)
     this.HEAD = branch
+    this.branches.push(branch)
     console.log("Switched to new Branch: " + branchName)
     return this
   }

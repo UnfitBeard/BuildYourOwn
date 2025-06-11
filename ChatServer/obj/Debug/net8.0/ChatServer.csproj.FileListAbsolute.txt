@@ -13,3 +13,18 @@
 /home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.pdb
 /home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.genruntimeconfig.cache
 /home/mr-nobody/Learning/BuildYourOwnX/BuildYourOwn/ChatServer/obj/Debug/net8.0/ref/ChatServer.dll
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.deps.json
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.runtimeconfig.json
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.dll
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/bin/Debug/net8.0/ChatServer.pdb
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.GeneratedMSBuildEditorConfig.editorconfig
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.AssemblyInfoInputs.cache
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.AssemblyInfo.cs
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.csproj.CoreCompileInputs.cache
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.sourcelink.json
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.dll
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/refint/ChatServer.dll
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.pdb
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ChatServer.genruntimeconfig.cache
+/Filesystem Root/Learning/BuildYourOwn/ChatServer/obj/Debug/net8.0/ref/ChatServer.dll

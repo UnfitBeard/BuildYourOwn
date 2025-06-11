@@ -30,3 +30,5 @@ console.assert(test.HEAD.name === "master")
 test.checkout("testing")
 console.assert(test.HEAD.name === "testing")
 test.checkout("master")
+
+
