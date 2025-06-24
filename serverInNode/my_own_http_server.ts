@@ -29,17 +29,27 @@ type HTTPReq = {
 }
 
 type HTTPRes = {
-    code :number,
+    code: number,
     headers: Buffer[],
     body: BodyReader
 }
 
-type BodyReader ={
+type BodyReader = {
     length: number,
     read: () => Promise<Buffer>
 }
 
-const HTTPError = ''
+class HTTPError extends Error {
+    statusCode: number
+    constructor(statusCode: number, message?: string) {
+        super(message);
+
+        Object.setPrototypeOf(this, HTTPError.prototype)
+
+        this.name = 'HTTPError';
+        this.statusCode = statusCode;
+    }
+}
 
 function soInit(socket: net.Socket): TCPConn {
     const conn: TCPConn = {
@@ -123,7 +133,7 @@ main()
 async function serveClient(conn: TCPConn) {
     const buf: DynBuf = { data: Buffer.alloc(0), length: 0, offset: 0 }
     while (true) {
-        const msg: null | HTTPReq  = cutMessage(buf)
+        const msg: null | HTTPReq = cutMessage(buf)
         if (!msg) {
             const data = await soRead(conn)
             bufPush(data, buf)
@@ -137,11 +147,11 @@ async function serveClient(conn: TCPConn) {
             }
             // got some data try it again
             continue
-        } 
+        }
 
         // Process the message and send the response
         const reqBody: BodyReader = readerFromReq(conn, buf, msg)
-        const res:HTTPRes = await handleReq(msg, reqBody)
+        const res: HTTPRes = await handleReq(msg, reqBody)
         await writeHTTPResp(conn, res);
 
         // close the connection for HTTP/1.0
@@ -150,7 +160,7 @@ async function serveClient(conn: TCPConn) {
         }
 
         // make sure the request body is consumed completely
-        while ((await reqBody.read()).length > 0) {/* empty */}
+        while ((await reqBody.read()).length > 0) {/* empty */ }
     }
 }
 
@@ -175,7 +185,7 @@ function bufPush(data: Buffer, buf: DynBuf) {
 
 function cutMessage(buf: DynBuf): null | HTTPReq | Buffer {
     const slice = buf.data.subarray(buf.offset, buf.length)
-    const idx = slice.indexOf("\n")
+    const idx = slice.indexOf("\r\n")
 
     if (idx < 0) {
         return null;
@@ -210,6 +220,34 @@ function handleReq(msg: Buffer | HTTPReq, reqBody: BodyReader): HTTPRes | Promis
 }
 
 function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
+    throw new Error("Function not implemented.")
+}
+
+async function newConn(socket: net.Socket): Promise<void> {
+    const conn:TCPConn = soInit(socket);    
+    try {
+        await serveClient(conn)
+    } catch (exc) {
+        console.error("Error while serving client: ", exc);
+        if (exc instanceof HTTPError) {
+            // intended to send an error response
+            const resp:HTTPRes = {
+                code:exc.statusCode,
+                headers: [],
+                body: readerFromMemory(Buffer.from(exc.message + '\n'))
+            };
+            try {
+                await writeHTTPResp(conn, resp);
+            } catch (exc) {
+                /* ignore */
+            }
+        }
+    } finally {
+        socket.destroy()
+    }
+}
+
+function readerFromMemory(arg0: Buffer): BodyReader {
     throw new Error("Function not implemented.")
 }
 
