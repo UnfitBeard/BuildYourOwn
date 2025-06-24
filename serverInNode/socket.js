@@ -1,5 +1,4 @@
-import * as net from "net"
-import { type } from "os";
+const net = require('net');
 
 //2.Accept new connections
 function newConn(socket) {
@@ -28,3 +27,7 @@ server.on('connection', newConn);
 server.listen({host: '127.0.0.1', port: 1234}, () => {
 	console.log("Listening on port 1234")
 });
+function sum(a, b) {
+	return a + b;
+  }
+module.exports= {sum, newConn, server};
