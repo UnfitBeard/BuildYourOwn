@@ -16,12 +16,32 @@ type TCPListener = {
 }
 
 type DynBuf = {
-    data:Buffer,
+    data: Buffer,
     length: number,
     offset: number
 }
 
-function soInit(socket: net.Socket):TCPConn {
+type HTTPReq = {
+    method: string,
+    uri: Buffer,
+    version: string,
+    headers: Buffer
+}
+
+type HTTPRes = {
+    code :number,
+    headers: Buffer[],
+    body: BodyReader
+}
+
+type BodyReader ={
+    length: number,
+    read: () => Promise<Buffer>
+}
+
+const HTTPError = ''
+
+function soInit(socket: net.Socket): TCPConn {
     const conn: TCPConn = {
         socket: socket,
         err: null,
@@ -73,13 +93,11 @@ async function soWrite(conn: TCPConn, data: Buffer): Promise<void> {
     })
 }
 
-function soListen(port:number, host: string = "127.0.0.1"): TCPListener {
+function soListen(port: number, host: string = "127.0.0.1"): TCPListener {
     let server = net.createServer({ allowHalfOpen: true, pauseOnConnect: true });
-
-    server.listen({ port, hostname: host}, () => {
+    server.listen({ port, hostname: host }, () => {
         console.log(`Server listening on localhost:1234`)
     })
-
     return { server }
 }
 
@@ -102,28 +120,41 @@ async function main() {
 }
 main()
 
-async function serveClient(conn:TCPConn) {
-    const data:Buffer = await soRead(conn);
-    const buf:DynBuf = {data:Buffer.alloc(0), length:0, offset:0}
+async function serveClient(conn: TCPConn) {
+    const buf: DynBuf = { data: Buffer.alloc(0), length: 0, offset: 0 }
     while (true) {
-        const msg:Buffer|null = cutMessage(buf)
-       if (msg!.length === 0) {
-            console.log(Buffer.from('')) //EOF
-        } else {
-            console.log(msg)
-            bufPush(msg!, buf)
-            await soWrite(conn, msg!)
+        const msg: null | HTTPReq  = cutMessage(buf)
+        if (!msg) {
+            const data = await soRead(conn)
+            bufPush(data, buf)
+
+            if (data.length === 0 && buf.length === 0) {
+                return
+            }
+
+            if (data.length === 0) {
+                throw new HTTPError(400, 'Unexpected EOF')
+            }
+            // got some data try it again
+            continue
+        } 
+
+        // Process the message and send the response
+        const reqBody: BodyReader = readerFromReq(conn, buf, msg)
+        const res:HTTPRes = await handleReq(msg, reqBody)
+        await writeHTTPResp(conn, res);
+
+        // close the connection for HTTP/1.0
+        if (msg.version === '1.0') {
+            return
         }
-    
-        if (msg!.includes('q')) {
-            console.log("Connection ended")
-            conn.ended = true
-            conn.socket.destroy()
-        }
+
+        // make sure the request body is consumed completely
+        while ((await reqBody.read()).length > 0) {/* empty */}
     }
 }
 
-function bufPush(data: Buffer, buf:DynBuf) {
+function bufPush(data: Buffer, buf: DynBuf) {
     let newLen = data.length + buf.length
 
     if (newLen > buf.data.length) {
@@ -142,8 +173,8 @@ function bufPush(data: Buffer, buf:DynBuf) {
     buf.length = newLen
 }
 
-function cutMessage(buf: DynBuf):null|Buffer {
-    const slice = buf.data.subarray(0,buf.length)
+function cutMessage(buf: DynBuf): null | HTTPReq | Buffer {
+    const slice = buf.data.subarray(buf.offset, buf.length)
     const idx = slice.indexOf("\n")
 
     if (idx < 0) {
@@ -151,12 +182,34 @@ function cutMessage(buf: DynBuf):null|Buffer {
     }
 
     const msg = Buffer.from(buf.data.subarray(0, idx + 1))
-    bufPop(buf, idx + 1)
+
+    buf.offset += idx + 1
+
+    const wasted = buf.offset
+
+    const capacity = buf.data.length
+
+    if (wasted > capacity * 0.5) {
+        bufPop(buf)
+    }
     return msg;
 }
 
-function bufPop(buf: DynBuf, len: number) {
-    buf.data.copyWithin(0, len, buf.length)
-    buf.length -= len
+function bufPop(buf: DynBuf) {
+    buf.data.copyWithin(0, buf.offset, buf.length)
+    buf.length -= buf.offset
+    buf.offset = 0
+}
+
+function readerFromReq(conn: TCPConn, buf: DynBuf, msg: Buffer | HTTPReq): BodyReader {
+    throw new Error("Function not implemented.")
+}
+
+function handleReq(msg: Buffer | HTTPReq, reqBody: BodyReader): HTTPRes | PromiseLike<HTTPRes> {
+    throw new Error("Function not implemented.")
+}
+
+function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
+    throw new Error("Function not implemented.")
 }
 
