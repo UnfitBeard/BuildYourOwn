@@ -1,7 +1,3 @@
-Sure! Below is a `README.md` formatted version of the documentation for your Git-like repository simulation project:
-
----
-
 ```markdown
 # 🌀 Git Repository Simulator
 
@@ -18,8 +14,6 @@ A simple JavaScript simulation of a Git-like version control system, supporting 
 └── test.js      # File to run and test the Git module
 
 ````
-
----
 
 ## 🚀 Getting Started
 
@@ -185,11 +179,6 @@ MIT License. Use freely for learning or projects.
 
 ## 👤 Author
 
-Created by \[Your Name]. Contributions welcome!
+Created by \[UnfitBeard]. Contributions welcome!
 
-```
-
----
-
-Let me know if you'd like this README to include updated/fixed code or a test suite example in `test.js`.
 ```
