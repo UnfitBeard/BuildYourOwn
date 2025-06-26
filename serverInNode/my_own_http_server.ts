@@ -183,32 +183,31 @@ function bufPush(data: Buffer, buf: DynBuf) {
     buf.length = newLen
 }
 
-function cutMessage(buf: DynBuf): null | HTTPReq | Buffer {
-    const slice = buf.data.subarray(buf.offset, buf.length)
-    const idx = slice.indexOf("\r\n")
+// Define the maximum length of header
+const kMaxHeaderLen = 1024 * 8;
+
+// parse and remove qa heaedr from beginning of parser if possible
+function cutMessage(buf: DynBuf): HTTPReq|null {
+    const slice = buf.data.subarray(0, buf.length)
+    const idx = slice.indexOf("\r\n\r\n")
 
     if (idx < 0) {
-        return null;
+        if (buf.length > kMaxHeaderLen) {
+            throw new HTTPError(413, "Header is too large")
+        }
+        return null; // need more data
     }
 
-    const msg = Buffer.from(buf.data.subarray(0, idx + 1))
-
-    buf.offset += idx + 1
-
-    const wasted = buf.offset
-
-    const capacity = buf.data.length
-
-    if (wasted > capacity * 0.5) {
-        bufPop(buf)
-    }
+    // parse and remove header
+    const msg = parseHTTPReq(buf.data.subarray(0, idx + 4))
+    bufPop(buf, idx + 4)
     return msg;
 }
 
-function bufPop(buf: DynBuf) {
-    buf.data.copyWithin(0, buf.offset, buf.length)
-    buf.length -= buf.offset
-    buf.offset = 0
+function bufPop(buf: DynBuf, idx: number) {
+    buf.data.copyWithin(0, idx, buf.length)
+    buf.length -= idx
+    // buf.offset = 0
 }
 
 function readerFromReq(conn: TCPConn, buf: DynBuf, msg: Buffer | HTTPReq): BodyReader {
@@ -224,15 +223,15 @@ function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
 }
 
 async function newConn(socket: net.Socket): Promise<void> {
-    const conn:TCPConn = soInit(socket);    
+    const conn: TCPConn = soInit(socket);
     try {
         await serveClient(conn)
     } catch (exc) {
         console.error("Error while serving client: ", exc);
         if (exc instanceof HTTPError) {
             // intended to send an error response
-            const resp:HTTPRes = {
-                code:exc.statusCode,
+            const resp: HTTPRes = {
+                code: exc.statusCode,
                 headers: [],
                 body: readerFromMemory(Buffer.from(exc.message + '\n'))
             };
@@ -251,3 +250,63 @@ function readerFromMemory(arg0: Buffer): BodyReader {
     throw new Error("Function not implemented.")
 }
 
+// parse a HTTP Request Header
+function parseHTTPReq(data: Buffer) {
+    // split the data into lines
+    const lines: Buffer[] = splitLines(data)
+
+    // the first line is `method URI version`
+    const [method, uri, version] = parseRequestLine(lines[0])
+
+    // followed by header fields in the format of `Name"Value`
+    const headers: Buffer[] = []
+    for (let i = 1; i<lines.length - 1; i++) {
+        const h = Buffer.from(lines[i])
+
+        if(!validateHeader(h)) {
+            throw new HTTPError(400, 'Bad field')
+        }
+        headers.push(h)
+    }
+
+    // the header ends by an empty line
+    console.assert(lines[lines.length - 1].length === 0)
+    return {
+        method: method,
+        uri: uri,
+        version: version,
+        headers: headers
+    }
+}
+
+function splitLines(data: Buffer): Buffer[] {
+    let linesArr = []
+    let start = 0
+    let idx:number;
+
+    while ((idx = data.indexOf("\r\n\r\n", start)) !== -1) {
+        linesArr.push(data.subarray(start, idx));
+        start = idx + 4; 
+    }
+
+    if (start < data.length) {
+        linesArr.push(data.subarray(start))
+    }
+
+    return linesArr
+}
+
+function parseRequestLine(line: Buffer) {
+    var lineParts = line.toString().split(' ')
+    const requestLinePattern = /^[A-Z]+ \S+ HTTP\/\d+\.\d+$/g
+    if (!requestLinePattern.test(lineParts.join(' '))) {
+        throw new HTTPError(413, "Invalid HTTP Request")
+    }
+    const [method, uri, version] = lineParts
+    return [method, uri, version]
+}
+
+function validateHeader(h: Buffer): boolean {
+    const regex = /^[A-Za-z\-]+:\s.+$/g
+    return regex.test(h.toString())
+}
