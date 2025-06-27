@@ -25,7 +25,7 @@ type HTTPReq = {
     method: string,
     uri: Buffer,
     version: string,
-    headers: Buffer
+    headers: Buffer[]
 }
 
 type HTTPRes = {
@@ -210,8 +210,38 @@ function bufPop(buf: DynBuf, idx: number) {
     // buf.offset = 0
 }
 
-function readerFromReq(conn: TCPConn, buf: DynBuf, msg: Buffer | HTTPReq): BodyReader {
-    throw new Error("Function not implemented.")
+function readerFromReq(conn: TCPConn, buf: DynBuf, req: HTTPReq): BodyReader {
+    let bodyLen = -1
+    const contentLen = fieldGet(req.headers, "Content-Length")
+    if (contentLen) {
+        bodyLen = parseDec(contentLen.toString('latin1'));
+        if (isNaN(bodyLen)) {
+            throw new HTTPError(400, "Invalid Content-Length")
+        }
+    }
+
+    const bodyAllowed = !(req.method === 'GET' || req.method === 'HEAD');
+    const chunked = fieldGet(req.headers, "Transfer-Encoding")?.equals(Buffer.from("chunked")) || false;
+
+    if (!bodyAllowed &&(bodyLen > 0|| chunked)) {
+        throw new HTTPError(400, "Body not allowed")
+    }
+
+    if (!bodyAllowed) {
+        bodyLen = 0
+    }
+
+    if (bodyLen >= 0) {
+        // Content Length is present
+        return readerFromConnLength(conn, buf, bodyLen)
+    } else if (chunked) {
+        // chunked encoding 
+        throw new HTTPError(501, "TODO")
+    } else {
+        // read the rest of the connection
+        throw new HTTPError(501, "TODO")
+    }
+
 }
 
 function handleReq(msg: Buffer | HTTPReq, reqBody: BodyReader): HTTPRes | PromiseLike<HTTPRes> {
@@ -310,3 +340,18 @@ function validateHeader(h: Buffer): boolean {
     const regex = /^[A-Za-z\-]+:\s.+$/g
     return regex.test(h.toString())
 }
+
+function fieldGet(headers: Buffer[], key: string): null|Buffer {
+    return headers.find(header => {
+        header.toString('latin1') == key.toString()
+    }) || null
+}
+
+function parseDec(arg0: string): number {
+    return parseInt(arg0, 10);
+}
+
+function readerFromConnLength(conn: TCPConn, buf: DynBuf, bodyLen: number): BodyReader {
+    throw new Error("Function not implemented.")
+}
+
