@@ -28,9 +28,13 @@ typedef struct sObject
 
 /* VM - will contain the stack that stores the variables currently in scope */
 #define STACK_MAX 256
-
+#define INITIAL_GC_THRESHOLD 10 // Unreal
 typedef struct
 {
+    /*Total number of currently allocated objects*/
+    int numObjects;
+    /*Number of objects required to trigger a GC*/
+    int maxObjects;
     /*The first object (head) in the list of all objects*/
     Object *firstObject;
     Object *stack[STACK_MAX];
@@ -42,6 +46,9 @@ VM *newVM()
 {
     VM *vm = malloc(sizeof(VM));
     vm->stackSize = 0;
+
+    vm->numObjects = 0;
+    vm->maxObjects = INITIAL_GC_THRESHOLD;
     return vm;
 }
 
@@ -62,8 +69,19 @@ Object *pop(VM *vm)
 // this does memory allocations
 Object *newObject(VM *vm, ObjectType type)
 {
+    if (vm->numObjects >= vm->maxObjects)
+    {
+        gc(vm); // run garbage collection if we hit the limit
+    }
+
     Object *object = malloc(sizeof(Object));
     object->type = type;
+    object->marked = 0; // not marked yet
+
+    /* Insert it into a list of marked objects */
+    object->next = vm->firstObject;
+    vm->firstObject = object;
+    vm->numObjects++;
     return object;
 }
 
@@ -114,3 +132,40 @@ void mark(Object *object)
         mark(object->tail);
     }
 }
+
+// Sweeping
+void sweep(VM *vm)
+{
+    Object **object = &vm->firstObject;
+    while (object)
+    {
+        if (!(*object)->marked)
+        {
+            /* The object was not reachable so remove it from the list and free it*/
+            Object *unreachable = *object;
+
+            *object = unreachable->next; // remove from list
+            free(unreachable);           // free the object
+            vm->numObjects--;
+        }
+        else
+        {
+            /* The object was reachable, so unmark it for the next GC cycle */
+            (*object)->marked = 0;
+            object = &(*object)->next; // move to the next object
+        }
+    }
+}
+
+// Calling it
+void gc(VM *vm)
+{
+    int numObjects = vm->numObjects;
+
+    markAll(vm);
+    sweep(vm);
+
+    vm->maxObjects = vm->numObjects * 2;
+}
+
+// How about tracking the number of objects we've created
