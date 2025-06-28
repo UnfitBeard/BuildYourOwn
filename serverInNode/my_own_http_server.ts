@@ -128,7 +128,6 @@ async function main() {
         serveClient(conn)
     }
 }
-main()
 
 async function serveClient(conn: TCPConn) {
     const buf: DynBuf = { data: Buffer.alloc(0), length: 0, offset: 0 }
@@ -244,8 +243,25 @@ function readerFromReq(conn: TCPConn, buf: DynBuf, req: HTTPReq): BodyReader {
 
 }
 
-function handleReq(msg: Buffer | HTTPReq, reqBody: BodyReader): HTTPRes | PromiseLike<HTTPRes> {
-    throw new Error("Function not implemented.")
+function handleReq(req: HTTPReq, body: BodyReader): HTTPRes {
+    // act on the request URI
+   let resp: BodyReader;
+   switch (req.uri.toString('latin1')) {
+    case '/echo':
+        // http echo server
+        resp = body
+        break;
+
+    default:
+        resp = readerFromMemory(Buffer.from(''))
+        break;
+   }
+
+   return {
+    code: 200,
+    headers:[Buffer.from('Server: my_first_http_server')],
+    body: resp
+   }
 }
 
 function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
@@ -303,7 +319,7 @@ function parseHTTPReq(data: Buffer) {
     console.assert(lines[lines.length - 1].length === 0)
     return {
         method: method,
-        uri: uri,
+        uri: Buffer.from(uri),
         version: version,
         headers: headers
     }
@@ -327,13 +343,18 @@ function splitLines(data: Buffer): Buffer[] {
 }
 
 function parseRequestLine(line: Buffer) {
-    var lineParts = line.toString().split(' ')
-    const requestLinePattern = /^[A-Z]+ \S+ HTTP\/\d+\.\d+$/g
+    const firstLine = line.toString().split('\r\n')[0]; // Extract the first line
+    console.log("Request Line:", firstLine); // Debugging log
+
+    const lineParts = firstLine.split(' ');
+    const requestLinePattern = /^[A-Z]+ \S+ HTTP\/\d+\.\d+$/;
+
     if (!requestLinePattern.test(lineParts.join(' '))) {
-        throw new HTTPError(413, "Invalid HTTP Request")
+        throw new HTTPError(413, `Invalid HTTP Request: ${firstLine}`);
     }
-    const [method, uri, version] = lineParts
-    return [method, uri, version]
+
+    const [method, uri, version] = lineParts;
+    return [method, uri, version];
 }
 
 function validateHeader(h: Buffer): boolean {
@@ -351,7 +372,31 @@ function parseDec(arg0: string): number {
     return parseInt(arg0, 10);
 }
 
-function readerFromConnLength(conn: TCPConn, buf: DynBuf, bodyLen: number): BodyReader {
-    throw new Error("Function not implemented.")
+function readerFromConnLength(conn: TCPConn, buf: DynBuf, remain: number): BodyReader {
+    return {
+        length: remain,
+        read: async(): Promise<Buffer> => {
+            if (remain === 0) {
+                return Buffer.from(''); //done
+            }
+            if (buf.length === 0) {
+                // try to get some data if there is none
+                const data = await soRead(conn);
+                bufPush(data, buf);
+                if (data.length === 0) {
+                    // expect more data
+                    throw new Error('Unexpected EOF from HTTP Body');
+                }
+            }
+
+            // consume data from the buffer
+            const consume = Math.min(buf.length, remain)
+            remain -= consume;
+            const data = Buffer.from(buf.data.subarray(0, consume))
+            bufPop(buf, consume)
+            return data;
+        }
+    }
 }
 
+main()
