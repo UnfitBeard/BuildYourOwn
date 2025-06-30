@@ -243,7 +243,7 @@ function readerFromReq(conn: TCPConn, buf: DynBuf, req: HTTPReq): BodyReader {
 
 }
 
-function handleReq(req: HTTPReq, body: BodyReader): HTTPRes {
+async function handleReq(req: HTTPReq, body: BodyReader): Promise<HTTPRes> {
     // act on the request URI
    let resp: BodyReader;
    switch (req.uri.toString('latin1')) {
@@ -253,7 +253,7 @@ function handleReq(req: HTTPReq, body: BodyReader): HTTPRes {
         break;
 
     default:
-        resp = readerFromMemory(Buffer.from(''))
+        resp = readerFromMemory(Buffer.from('hello world\n'));
         break;
    }
 
@@ -264,8 +264,25 @@ function handleReq(req: HTTPReq, body: BodyReader): HTTPRes {
    }
 }
 
-function writeHTTPResp(conn: TCPConn, res: HTTPRes) {
-    throw new Error("Function not implemented.")
+async function writeHTTPResp(conn: TCPConn, resp: HTTPRes) {
+    if (resp.body.length < 0) {
+        throw new Error('TODO: Chunked Encoding')
+    }
+
+    // Set the content -length field
+    console.assert(!fieldGet(resp.headers, 'Content-Length'))
+    resp.headers.push(Buffer.from(`Content-Length: ${resp.body.length}`));
+
+    // write the header
+    await soWrite(conn, await encodeHTTPResp(resp));
+    // write the body
+    while (true) {
+        const data = await resp.body.read();
+        if (data.length === 0) {
+            break; // done
+        }
+        await soWrite(conn, data);
+    }
 }
 
 async function newConn(socket: net.Socket): Promise<void> {
@@ -292,8 +309,19 @@ async function newConn(socket: net.Socket): Promise<void> {
     }
 }
 
-function readerFromMemory(arg0: Buffer): BodyReader {
-    throw new Error("Function not implemented.")
+function readerFromMemory(data: Buffer): BodyReader {
+    let done = false
+    return {
+        length: data.length,
+        read: async (): Promise<Buffer> => {
+            if (done) {
+                return Buffer.from('')
+            } else {
+                done = true;
+                return data;
+            }
+        }
+    }
 }
 
 // parse a HTTP Request Header
@@ -399,4 +427,16 @@ function readerFromConnLength(conn: TCPConn, buf: DynBuf, remain: number): BodyR
     }
 }
 
+
 main()
+
+async function encodeHTTPResp(resp: HTTPRes): Promise<Buffer> {
+    let header = `HTTP/1.1 ${resp.code} OK\r\n`;
+    for (const h of resp.headers) {
+        header += h.toString('latin1') + '\r\n';
+    }
+    header += '\r\n'; // end of headers
+
+    const body = resp.body.length > 0 ? await resp.body.read() : Buffer.from('');
+    return Buffer.concat([Buffer.from(header, 'latin1'), body]);
+}
